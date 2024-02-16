@@ -1,7 +1,19 @@
 type Query {
-	ping: String!
+	getIngestionJobStatus(input: GetIngestionJobStatusInput!): String!
 }
 
 type Mutation {
 	createKnowledgeBaseWithDataSource(name: String!): String! @aws_api_key
+	startIngestionJob(input: StartIngestionJobInput!): String! @aws_api_key
+}
+
+input StartIngestionJobInput {
+	knowledgeBaseId: String!
+	dataSourceId: String!
+}
+
+input GetIngestionJobStatusInput {
+	ingestionJobId: String!
+	knowledgeBaseId: String!
+	dataSourceId: String!
 }

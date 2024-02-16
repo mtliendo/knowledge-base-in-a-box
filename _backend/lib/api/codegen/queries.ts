@@ -8,7 +8,10 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
-export const ping = /* GraphQL */ `query Ping {
-  ping
+export const getIngestionJobStatus = /* GraphQL */ `query GetIngestionJobStatus($input: GetIngestionJobStatusInput!) {
+  getIngestionJobStatus(input: $input)
 }
-` as GeneratedQuery<APITypes.PingQueryVariables, APITypes.PingQuery>;
+` as GeneratedQuery<
+  APITypes.GetIngestionJobStatusQueryVariables,
+  APITypes.GetIngestionJobStatusQuery
+>;

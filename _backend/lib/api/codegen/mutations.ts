@@ -15,3 +15,10 @@ export const createKnowledgeBaseWithDataSource = /* GraphQL */ `mutation CreateK
   APITypes.CreateKnowledgeBaseWithDataSourceMutationVariables,
   APITypes.CreateKnowledgeBaseWithDataSourceMutation
 >;
+export const startIngestionJob = /* GraphQL */ `mutation StartIngestionJob($input: StartIngestionJobInput!) {
+  startIngestionJob(input: $input)
+}
+` as GeneratedMutation<
+  APITypes.StartIngestionJobMutationVariables,
+  APITypes.StartIngestionJobMutation
+>;

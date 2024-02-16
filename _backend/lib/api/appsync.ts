@@ -60,6 +60,14 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 						resources: [props.pineconeSecretArn],
 						actions: ['secretsmanager:GetSecretValue'],
 					}),
+					new awsIam.PolicyStatement({
+						resources: [props.bucketArn],
+						actions: ['s3:ListBucket'],
+					}),
+					new awsIam.PolicyStatement({
+						resources: [`${props.bucketArn}/protected/*`],
+						actions: ['s3:GetObject'],
+					}),
 				],
 			}),
 		},
@@ -73,6 +81,31 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		PINECONE_CONNECTION_STRING: props.pineconeConnectionString,
 		PINECONE_SECRET_ARN: props.pineconeSecretArn,
 	}
+
+	const createStartIngestionJobFunc = api.createResolver(
+		'createStartIngestionJobFunc',
+		{
+			typeName: 'Mutation',
+			fieldName: 'startIngestionJob',
+			dataSource: bedrockDataSource,
+			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
+			code: awsAppsync.Code.fromAsset(
+				path.join(__dirname, 'JS_Functions/createStartIngestionJob.js')
+			),
+		}
+	)
+	const createGetIngestionJobStatusFunc = api.createResolver(
+		'createGetIngestionJobStatusFunc',
+		{
+			typeName: 'Query',
+			fieldName: 'getIngestionJobStatus',
+			dataSource: bedrockDataSource,
+			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
+			code: awsAppsync.Code.fromAsset(
+				path.join(__dirname, 'JS_Functions/createGetIngestionJobStatus.js')
+			),
+		}
+	)
 
 	const createKnowledgeBaseFunc = bedrockDataSource.createFunction(
 		'createKnowledgeBaseFunc',
@@ -107,11 +140,11 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 			createKnowledgeBaseDatasourceFunc,
 		],
 	})
-	// let the datasource pass and IAM role (see inline pipeline code below)
+	// let the datasource pass an IAM role to bedrock
 	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
 		new awsIam.PolicyStatement({
-			actions: ['iam:PassRole'],
 			resources: [roleForKnowledgeBase.roleArn],
+			actions: ['iam:PassRole'],
 		})
 	)
 
@@ -143,22 +176,23 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		allowDatasourceToCreateKnowledgeBaseDatasource
 	)
 
-	// const allowDatasourceToStartIngestionJob = new PolicyStatement({
-	// 	resources: ['*'],
-	// 	actions: ['bedrock:StartIngestionJob'],
-	// })
+	const allowDatasourceToStartIngestionJob = new awsIam.PolicyStatement({
+		resources: ['*'],
+		actions: ['bedrock:StartIngestionJob'],
+	})
 
-	// bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-	// 	allowDatasourceToStartIngestionJob
-	// )
-	// const allowDatasourceToGetIngestionJobStatus = new PolicyStatement({
-	// 	resources: ['*'],
-	// 	actions: ['bedrock:GetIngestionJob'],
-	// })
+	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
+		allowDatasourceToStartIngestionJob
+	)
 
-	// bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-	// 	allowDatasourceToGetIngestionJobStatus
-	// )
+	const allowDatasourceToGetIngestionJobStatus = new awsIam.PolicyStatement({
+		resources: ['*'],
+		actions: ['bedrock:GetIngestionJob'],
+	})
+
+	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
+		allowDatasourceToGetIngestionJobStatus
+	)
 
 	// const allowDatasourceToRetrieveAndGenerateResponse = new PolicyStatement({
 	// 	resources: ['*'],
@@ -171,7 +205,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 
 	// const allowDatasourceToCallClaude = new PolicyStatement({
 	// 	resources: [
-	// 		`arn:aws:bedrock:${scope.region}::foundation-model/amazon.titan-embed-text-v1`,
+	// 		`arn:aws:bedrock:${scope.region}::foundation-model/anthropic.claude-v2`,
 	// 	],
 	// 	actions: ['bedrock:InvokeModel'],
 	// })
