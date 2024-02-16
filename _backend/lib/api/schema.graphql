@@ -1,0 +1,7 @@
+type Query {
+	ping: String!
+}
+
+type Mutation {
+	createKnowledgeBaseWithDataSource(name: String!): String! @aws_api_key
+}
