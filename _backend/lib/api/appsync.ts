@@ -13,6 +13,7 @@ type AppSyncAPIProps = {
 	bucketArn: string
 	pineconeConnectionString: string
 	pineconeSecretArn: string
+	foundationModelArn: string
 }
 
 export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
@@ -36,6 +37,18 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 	const bedrockDataSource = api.addHttpDataSource(
 		'bedrockDS',
 		`https://bedrock-agent.${scope.region}.amazonaws.com`,
+		{
+			authorizationConfig: {
+				signingRegion: scope.region,
+				signingServiceName: 'bedrock',
+			},
+		}
+	)
+
+	// https://docs.aws.amazon.com/bedrock/latest/APIReference/API_Operations_Agents_for_Amazon_Bedrock_Runtime.html
+	const bedrockRetrieveAndGenerateDS = api.addHttpDataSource(
+		'bedrockRetrieveAndGenerateDS',
+		`https://bedrock-agent-runtime.${scope.region}.amazonaws.com`,
 		{
 			authorizationConfig: {
 				signingRegion: scope.region,
@@ -80,8 +93,21 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		BUCKET_ARN: props.bucketArn,
 		PINECONE_CONNECTION_STRING: props.pineconeConnectionString,
 		PINECONE_SECRET_ARN: props.pineconeSecretArn,
+		FOUNDATION_MODEL_ARN: props.foundationModelArn,
 	}
 
+	const retrieveAndGenerateResponseResolver = api.createResolver(
+		'retrieveAndGenerateResponseResolver',
+		{
+			typeName: 'Mutation',
+			fieldName: 'retrieveAndGenerateResponse',
+			dataSource: bedrockRetrieveAndGenerateDS,
+			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
+			code: awsAppsync.Code.fromAsset(
+				path.join(__dirname, 'JS_Functions/retrieveAndGenerateResponse.js')
+			),
+		}
+	)
 	const createStartIngestionJobFunc = api.createResolver(
 		'createStartIngestionJobFunc',
 		{
@@ -194,25 +220,35 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		allowDatasourceToGetIngestionJobStatus
 	)
 
-	// const allowDatasourceToRetrieveAndGenerateResponse = new PolicyStatement({
-	// 	resources: ['*'],
-	// 	actions: ['bedrock:RetrieveAndGenerate'],
-	// })
+	const allowDatasourceToRetrieveAndGenerateResponse =
+		new awsIam.PolicyStatement({
+			resources: ['*'],
+			actions: ['bedrock:RetrieveAndGenerate'],
+		})
 
-	// bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-	// 	allowDatasourceToRetrieveAndGenerateResponse
-	// )
+	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
+		allowDatasourceToRetrieveAndGenerateResponse
+	)
 
-	// const allowDatasourceToCallClaude = new PolicyStatement({
-	// 	resources: [
-	// 		`arn:aws:bedrock:${scope.region}::foundation-model/anthropic.claude-v2`,
-	// 	],
-	// 	actions: ['bedrock:InvokeModel'],
-	// })
+	const allowDatasourceToRetrieveResponse = new awsIam.PolicyStatement({
+		resources: ['*'],
+		actions: ['bedrock:Retrieve'],
+	})
 
-	// bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-	// 	allowDatasourceToCallClaude
-	// )
+	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
+		allowDatasourceToRetrieveResponse
+	)
+
+	const allowDatasourceToCallClaude = new awsIam.PolicyStatement({
+		resources: [
+			`arn:aws:bedrock:${scope.region}::foundation-model/anthropic.claude-v2`,
+		],
+		actions: ['bedrock:InvokeModel'],
+	})
+
+	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
+		allowDatasourceToCallClaude
+	)
 
 	return api
 }

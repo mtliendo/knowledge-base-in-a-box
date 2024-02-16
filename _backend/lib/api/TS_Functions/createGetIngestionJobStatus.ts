@@ -19,7 +19,3 @@ export function response(ctx: Context) {
 	console.log('response from ingestion', ctx.result)
 	return ctx.result.body
 }
-
-// kbid: 3CULQSHHKP
-// dsid: 6ELWKW78L2
-// jobid: Y4UITXWPYN

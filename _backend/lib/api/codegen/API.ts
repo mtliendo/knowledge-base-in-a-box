@@ -7,6 +7,12 @@ export type StartIngestionJobInput = {
   dataSourceId: string,
 };
 
+export type RetrieveAndGenerateResponseInput = {
+  text: string,
+  knowledgeBaseId: string,
+  sessionId?: string | null,
+};
+
 export type GetIngestionJobStatusInput = {
   ingestionJobId: string,
   knowledgeBaseId: string,
@@ -27,6 +33,14 @@ export type StartIngestionJobMutationVariables = {
 
 export type StartIngestionJobMutation = {
   startIngestionJob: string,
+};
+
+export type RetrieveAndGenerateResponseMutationVariables = {
+  input: RetrieveAndGenerateResponseInput,
+};
+
+export type RetrieveAndGenerateResponseMutation = {
+  retrieveAndGenerateResponse?: string | null,
 };
 
 export type GetIngestionJobStatusQueryVariables = {

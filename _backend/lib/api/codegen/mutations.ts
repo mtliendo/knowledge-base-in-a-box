@@ -22,3 +22,12 @@ export const startIngestionJob = /* GraphQL */ `mutation StartIngestionJob($inpu
   APITypes.StartIngestionJobMutationVariables,
   APITypes.StartIngestionJobMutation
 >;
+export const retrieveAndGenerateResponse = /* GraphQL */ `mutation RetrieveAndGenerateResponse(
+  $input: RetrieveAndGenerateResponseInput!
+) {
+  retrieveAndGenerateResponse(input: $input)
+}
+` as GeneratedMutation<
+  APITypes.RetrieveAndGenerateResponseMutationVariables,
+  APITypes.RetrieveAndGenerateResponseMutation
+>;

@@ -5,6 +5,8 @@ type Query {
 type Mutation {
 	createKnowledgeBaseWithDataSource(name: String!): String! @aws_api_key
 	startIngestionJob(input: StartIngestionJobInput!): String! @aws_api_key
+	retrieveAndGenerateResponse(input: RetrieveAndGenerateResponseInput!): String
+		@aws_api_key
 }
 
 input StartIngestionJobInput {
@@ -16,4 +18,10 @@ input GetIngestionJobStatusInput {
 	ingestionJobId: String!
 	knowledgeBaseId: String!
 	dataSourceId: String!
+}
+
+input RetrieveAndGenerateResponseInput {
+	text: String!
+	knowledgeBaseId: String!
+	sessionId: String
 }

@@ -20,6 +20,7 @@ export class KnowlegeBaseBackendStack extends cdk.Stack {
 			pineconeSecretArn,
 			pineconeConnectionString,
 			bucketArn: bucket.bucketArn,
+			foundationModelArn: `arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-v2`,
 		})
 	}
 }
