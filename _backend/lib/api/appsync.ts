@@ -223,7 +223,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 /* todo:
 //* 1. cleanup code (minimize policies, ensure envvars and props are where they need to be, etc) ✅
 //* 2. add values to context api✅
-//* 3. add in cognito and update s3 permissions
+//* 3. add in cognito and update s3 permissions✅
 //* 4. create frontend: landing page, auth page, chat interface for signed in users, admin page to configure storage
 //* 5. add hosting
 //* 6. document
