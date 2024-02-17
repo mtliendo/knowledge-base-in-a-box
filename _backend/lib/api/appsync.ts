@@ -1,22 +1,23 @@
 import * as path from 'path'
 import * as awsAppsync from 'aws-cdk-lib/aws-appsync'
 import * as awsIam from 'aws-cdk-lib/aws-iam'
-import { UserPool } from 'aws-cdk-lib/aws-cognito'
 import { Stack } from 'aws-cdk-lib'
+import { IUserPool } from 'aws-cdk-lib/aws-cognito'
 
+//Props needing to be passed to create the AppSync API and deps
 type AppSyncAPIProps = {
 	appName: string
-	// userPool: UserPool
-	// // authRole: awsIam.IRole
-	// // unauthRole: awsIam.IRole
-	// identityPoolId: string
 	bucketArn: string
 	pineconeConnectionString: string
 	pineconeSecretArn: string
 	foundationModelArn: string
+	embeddingModelArn: string
+	userpool: IUserPool
 }
 
+// function to create the appsync API and needed deps
 export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
+	//* L2 construct to create the AppSync API. Includes logging to cloudwatch
 	const api = new awsAppsync.GraphqlApi(scope, `${props.appName}`, {
 		name: props.appName,
 		definition: awsAppsync.Definition.fromFile(
@@ -24,7 +25,10 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		),
 		authorizationConfig: {
 			defaultAuthorization: {
-				authorizationType: awsAppsync.AuthorizationType.API_KEY,
+				authorizationType: awsAppsync.AuthorizationType.USER_POOL,
+				userPoolConfig: {
+					userPool: props.userpool,
+				},
 			},
 		},
 		logConfig: {
@@ -32,9 +36,11 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		},
 	})
 
-	// add bedrock as a data source
-	// How I knew it was "bedrock-agent-runtime": https://docs.aws.amazon.com/bedrock/latest/APIReference/welcome.html
-	const bedrockDataSource = api.addHttpDataSource(
+	//* Init AppSync HTTP datasource endpoints
+
+	// How I knew it was "bedrock-agent":
+	// https://docs.aws.amazon.com/bedrock/latest/APIReference/welcome.html
+	const bedrockKnowledgeBaseDataSource = api.addHttpDataSource(
 		'bedrockDS',
 		`https://bedrock-agent.${scope.region}.amazonaws.com`,
 		{
@@ -45,6 +51,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		}
 	)
 
+	// How I knew it was "bedrock-agent-runtime":
 	// https://docs.aws.amazon.com/bedrock/latest/APIReference/API_Operations_Agents_for_Amazon_Bedrock_Runtime.html
 	const bedrockRetrieveAndGenerateDS = api.addHttpDataSource(
 		'bedrockRetrieveAndGenerateDS',
@@ -57,6 +64,9 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		}
 	)
 
+	//* Init roles and policies
+
+	//The role for the appSync datasource to pass to Bedrock
 	const roleForKnowledgeBase = new awsIam.Role(scope, `${props.appName}-role`, {
 		assumedBy: new awsIam.ServicePrincipal('bedrock.amazonaws.com'),
 		roleName: `AmazonBedrockExecutionRoleForKnowledgeBase_${props.appName}`,
@@ -65,30 +75,68 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 				statements: [
 					new awsIam.PolicyStatement({
 						actions: ['bedrock:InvokeModel'],
-						resources: [
-							`arn:aws:bedrock:${scope.region}::foundation-model/amazon.titan-embed-text-v1`,
-						],
+						resources: [props.embeddingModelArn],
 					}),
 					new awsIam.PolicyStatement({
-						resources: [props.pineconeSecretArn],
 						actions: ['secretsmanager:GetSecretValue'],
+						resources: [props.pineconeSecretArn],
 					}),
 					new awsIam.PolicyStatement({
-						resources: [props.bucketArn],
 						actions: ['s3:ListBucket'],
+						resources: [props.bucketArn],
 					}),
 					new awsIam.PolicyStatement({
-						resources: [`${props.bucketArn}/protected/*`],
 						actions: ['s3:GetObject'],
+						resources: [`${props.bucketArn}/protected/*`],
 					}),
 				],
 			}),
 		},
 	})
 
+	// let the datasource pass the above IAM role to bedrock
+	bedrockKnowledgeBaseDataSource.grantPrincipal.addToPrincipalPolicy(
+		new awsIam.PolicyStatement({
+			resources: [roleForKnowledgeBase.roleArn],
+			actions: ['iam:PassRole'],
+		})
+	)
+
+	bedrockKnowledgeBaseDataSource.grantPrincipal.addToPrincipalPolicy(
+		new awsIam.PolicyStatement({
+			resources: ['*'],
+			actions: [
+				'bedrock:CreateKnowledgeBase',
+				'bedrock:AssociateThirdPartyKnowledgeBase',
+				'bedrock:CreateDataSource',
+				'bedrock:StartIngestionJob',
+				'bedrock:GetIngestionJob',
+			],
+		})
+	)
+
+	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
+		new awsIam.PolicyStatement({
+			resources: [
+				`arn:aws:bedrock:${scope.region}::foundation-model/anthropic.claude-v2`,
+			],
+			actions: ['bedrock:InvokeModel'],
+		})
+	)
+	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
+		new awsIam.PolicyStatement({
+			resources: [`*`],
+			actions: ['bedrock:Retrieve', 'bedrock:RetrieveAndGenerate'],
+		})
+	)
+
+	//* Init Adding envVars
+
+	// Dropping down to L1 construct until this is merged:
+	// https://github.com/aws/aws-cdk/pull/29064
 	const cfnAPI = api.node.defaultChild as awsAppsync.CfnGraphQLApi
 	cfnAPI.environmentVariables = {
-		EMBEDDING_MODEL_ARN: `arn:aws:bedrock:${scope.region}::foundation-model/amazon.titan-embed-text-v1`,
+		EMBEDDING_MODEL_ARN: props.embeddingModelArn,
 		ROLE_ARN_FOR_KNOWLEDGEBASE: roleForKnowledgeBase.roleArn,
 		BUCKET_ARN: props.bucketArn,
 		PINECONE_CONNECTION_STRING: props.pineconeConnectionString,
@@ -96,6 +144,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		FOUNDATION_MODEL_ARN: props.foundationModelArn,
 	}
 
+	//* Init AppSync resolvers
 	const retrieveAndGenerateResponseResolver = api.createResolver(
 		'retrieveAndGenerateResponseResolver',
 		{
@@ -113,7 +162,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		{
 			typeName: 'Mutation',
 			fieldName: 'startIngestionJob',
-			dataSource: bedrockDataSource,
+			dataSource: bedrockKnowledgeBaseDataSource,
 			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
 			code: awsAppsync.Code.fromAsset(
 				path.join(__dirname, 'JS_Functions/createStartIngestionJob.js')
@@ -125,7 +174,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		{
 			typeName: 'Query',
 			fieldName: 'getIngestionJobStatus',
-			dataSource: bedrockDataSource,
+			dataSource: bedrockKnowledgeBaseDataSource,
 			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
 			code: awsAppsync.Code.fromAsset(
 				path.join(__dirname, 'JS_Functions/createGetIngestionJobStatus.js')
@@ -133,7 +182,7 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 		}
 	)
 
-	const createKnowledgeBaseFunc = bedrockDataSource.createFunction(
+	const createKnowledgeBaseFunc = bedrockKnowledgeBaseDataSource.createFunction(
 		'createKnowledgeBaseFunc',
 		{
 			name: 'createKnowledgeBaseFunc',
@@ -143,16 +192,17 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 			),
 		}
 	)
-	const createKnowledgeBaseDatasourceFunc = bedrockDataSource.createFunction(
-		'createKnowledgeBaseDatasourceFunc',
-		{
-			name: 'createKnowledgeBaseDatasourceFunc',
-			runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
-			code: awsAppsync.Code.fromAsset(
-				path.join(__dirname, 'JS_Functions/createKnowledgeBaseDatasource.js')
-			),
-		}
-	)
+	const createKnowledgeBaseDatasourceFunc =
+		bedrockKnowledgeBaseDataSource.createFunction(
+			'createKnowledgeBaseDatasourceFunc',
+			{
+				name: 'createKnowledgeBaseDatasourceFunc',
+				runtime: awsAppsync.FunctionRuntime.JS_1_0_0,
+				code: awsAppsync.Code.fromAsset(
+					path.join(__dirname, 'JS_Functions/createKnowledgeBaseDatasource.js')
+				),
+			}
+		)
 
 	const createKBwithDSResolver = api.createResolver('createKBwithDSResolver', {
 		typeName: 'Mutation',
@@ -166,89 +216,15 @@ export const createAppSyncAPI = (scope: Stack, props: AppSyncAPIProps) => {
 			createKnowledgeBaseDatasourceFunc,
 		],
 	})
-	// let the datasource pass an IAM role to bedrock
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		new awsIam.PolicyStatement({
-			resources: [roleForKnowledgeBase.roleArn],
-			actions: ['iam:PassRole'],
-		})
-	)
-
-	const allowDatasourceToCreateKnowledgeBase = new awsIam.PolicyStatement({
-		resources: ['*'],
-		actions: ['bedrock:CreateKnowledgeBase'],
-	})
-
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToCreateKnowledgeBase
-	)
-	const allowDatasourceToAssociateThirdPartyKnowledgeBase =
-		new awsIam.PolicyStatement({
-			resources: ['*'],
-			actions: ['bedrock:AssociateThirdPartyKnowledgeBase'],
-		})
-
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToAssociateThirdPartyKnowledgeBase
-	)
-
-	const allowDatasourceToCreateKnowledgeBaseDatasource =
-		new awsIam.PolicyStatement({
-			resources: ['*'],
-			actions: ['bedrock:CreateDataSource'],
-		})
-
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToCreateKnowledgeBaseDatasource
-	)
-
-	const allowDatasourceToStartIngestionJob = new awsIam.PolicyStatement({
-		resources: ['*'],
-		actions: ['bedrock:StartIngestionJob'],
-	})
-
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToStartIngestionJob
-	)
-
-	const allowDatasourceToGetIngestionJobStatus = new awsIam.PolicyStatement({
-		resources: ['*'],
-		actions: ['bedrock:GetIngestionJob'],
-	})
-
-	bedrockDataSource.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToGetIngestionJobStatus
-	)
-
-	const allowDatasourceToRetrieveAndGenerateResponse =
-		new awsIam.PolicyStatement({
-			resources: ['*'],
-			actions: ['bedrock:RetrieveAndGenerate'],
-		})
-
-	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToRetrieveAndGenerateResponse
-	)
-
-	const allowDatasourceToRetrieveResponse = new awsIam.PolicyStatement({
-		resources: ['*'],
-		actions: ['bedrock:Retrieve'],
-	})
-
-	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToRetrieveResponse
-	)
-
-	const allowDatasourceToCallClaude = new awsIam.PolicyStatement({
-		resources: [
-			`arn:aws:bedrock:${scope.region}::foundation-model/anthropic.claude-v2`,
-		],
-		actions: ['bedrock:InvokeModel'],
-	})
-
-	bedrockRetrieveAndGenerateDS.grantPrincipal.addToPrincipalPolicy(
-		allowDatasourceToCallClaude
-	)
 
 	return api
 }
+
+/* todo:
+//* 1. cleanup code (minimize policies, ensure envvars and props are where they need to be, etc) ✅
+//* 2. add values to context api✅
+//* 3. add in cognito and update s3 permissions
+//* 4. create frontend: landing page, auth page, chat interface for signed in users, admin page to configure storage
+//* 5. add hosting
+//* 6. document
+*/

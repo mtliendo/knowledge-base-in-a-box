@@ -1,12 +1,15 @@
 type Query {
 	getIngestionJobStatus(input: GetIngestionJobStatusInput!): String!
+		@aws_cognito_user_pools
 }
 
 type Mutation {
-	createKnowledgeBaseWithDataSource(name: String!): String! @aws_api_key
-	startIngestionJob(input: StartIngestionJobInput!): String! @aws_api_key
+	createKnowledgeBaseWithDataSource(name: String!): String!
+		@aws_cognito_user_pools
+	startIngestionJob(input: StartIngestionJobInput!): String!
+		@aws_cognito_user_pools
 	retrieveAndGenerateResponse(input: RetrieveAndGenerateResponseInput!): String
-		@aws_api_key
+		@aws_cognito_user_pools
 }
 
 input StartIngestionJobInput {

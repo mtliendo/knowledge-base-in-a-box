@@ -1,0 +1,10 @@
+{
+	"globals": {
+		"appName": "knowlege-base-app",
+		"region": "us-east-1",
+		"pineconeConnectionString": "https://quickstart-bedrock-h32akzb.svc.apw5-4e34-81fa.pinecone.io",
+		"pineconeSecretArn": "arn:aws:secretsmanager:us-east-1:842537737558:secret:pineconekbserverless-AhIREU",
+		"foundationModelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2",
+		"embeddingModelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+	}
+}

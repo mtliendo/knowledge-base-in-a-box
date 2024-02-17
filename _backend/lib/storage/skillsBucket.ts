@@ -8,7 +8,7 @@ import {
 import { Stack } from 'aws-cdk-lib'
 
 type CreateSkillsBucketProps = {
-	// authenticatedRole: IRole
+	authenticatedRole: IRole
 	appName: String
 }
 
@@ -47,12 +47,12 @@ export function createSkillsBucket(
 		],
 	})
 
-	// new ManagedPolicy(scope, 'SignedInUserManagedPolicy-test', {
-	// 	description:
-	// 		'managed Policy to allow upload access to s3 bucket by signed in users.',
-	// 	statements: [canUpdateAndReadFromOwnProtectedDirectory],
-	// 	roles: [props.authenticatedRole],
-	// })
+	new ManagedPolicy(scope, 'SignedInUserManagedPolicy-test', {
+		description:
+			'managed Policy to allow upload access to s3 bucket by signed in users.',
+		statements: [canUpdateAndReadFromOwnProtectedDirectory],
+		roles: [props.authenticatedRole],
+	})
 
 	return fileStorageBucket
 }
