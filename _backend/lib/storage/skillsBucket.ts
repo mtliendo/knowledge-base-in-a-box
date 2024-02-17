@@ -43,11 +43,11 @@ export function createSkillsBucket(
 		effect: Effect.ALLOW,
 		actions: ['s3:PutObject', 's3:GetObject'],
 		resources: [
-			`arn:aws:s3:${scope.region}::${fileStorageBucket.bucketName}/protected/\${cognito-identity.amazonaws.com:sub}/*`,
+			`arn:aws:s3:::${fileStorageBucket.bucketName}/protected/\${cognito-identity.amazonaws.com:sub}/*`,
 		],
 	})
 
-	new ManagedPolicy(scope, 'SignedInUserManagedPolicy-test', {
+	new ManagedPolicy(scope, `${props.appName}-SignedInUserManagedPolicy`, {
 		description:
 			'managed Policy to allow upload access to s3 bucket by signed in users.',
 		statements: [canUpdateAndReadFromOwnProtectedDirectory],
