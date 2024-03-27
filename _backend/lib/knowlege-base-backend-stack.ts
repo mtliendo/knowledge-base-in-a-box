@@ -50,6 +50,10 @@ export class KnowlegeBaseBackendStack extends cdk.Stack {
 			value: auth.identityPool.identityPoolId,
 		})
 
+		new cdk.CfnOutput(this, 'BucketName', {
+			value: bucket.bucketName,
+		})
+
 		new cdk.CfnOutput(this, 'Region', {
 			value: this.region,
 		})

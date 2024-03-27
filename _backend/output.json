@@ -1,10 +1,11 @@
 {
-	"KnowlegeBaseBackendStack": {
-		"GraphQLAPIID": "p3ebizpmwzd6lhuqow4te3zoke",
-		"UserPoolClientId": "4u21o2apc8a19t8s3hq3t2hp3",
-		"UserPoolId": "us-east-1_602o134VG",
-		"GraphQLAPIURL": "https://slol4a63ojeafbl5t5v4xuvaba.appsync-api.us-east-1.amazonaws.com/graphql",
-		"Region": "us-east-1",
-		"IdentityPoolId": "us-east-1:8e343de3-0475-4d37-bdf7-4282294d0a95"
-	}
+  "KnowlegeBaseBackendStack": {
+    "GraphQLAPIID": "p3ebizpmwzd6lhuqow4te3zoke",
+    "UserPoolClientId": "4u21o2apc8a19t8s3hq3t2hp3",
+    "UserPoolId": "us-east-1_602o134VG",
+    "BucketName": "knowlegebasebackendstack-knowlegebaseappbuckete9df-cvrs8n0ugqvk",
+    "GraphQLAPIURL": "https://slol4a63ojeafbl5t5v4xuvaba.appsync-api.us-east-1.amazonaws.com/graphql",
+    "Region": "us-east-1",
+    "IdentityPoolId": "us-east-1:8e343de3-0475-4d37-bdf7-4282294d0a95"
+  }
 }
